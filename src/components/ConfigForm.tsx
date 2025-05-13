@@ -3,7 +3,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertCircle, Eye, EyeOff } from "lucide-react";
+import { AlertCircle, Eye, EyeOff, Loader2 } from "lucide-react";
+import { testOpenAIKey, testTelegramToken } from "@/utils/connectionUtils";
 
 interface ConfigFormProps {
   onConnect: (telegramToken: string, openaiKey: string) => void;
@@ -17,22 +18,47 @@ const ConfigForm = ({ onConnect, onDisconnect, isConnected }: ConfigFormProps) =
   const [showTelegramToken, setShowTelegramToken] = useState(false);
   const [showOpenaiKey, setShowOpenaiKey] = useState(false);
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setIsLoading(true);
 
-    if (!telegramToken.trim()) {
-      setError("Telegram Bot Token is required");
-      return;
+    try {
+      if (!telegramToken.trim()) {
+        setError("Telegram Bot Token is required");
+        return;
+      }
+
+      if (!openaiKey.trim()) {
+        setError("OpenAI API Key is required");
+        return;
+      }
+
+      // Test the Telegram token
+      const isTelegramValid = await testTelegramToken(telegramToken);
+      if (!isTelegramValid) {
+        setError("Invalid Telegram Bot Token");
+        setIsLoading(false);
+        return;
+      }
+
+      // Test the OpenAI key
+      const isOpenAIValid = await testOpenAIKey(openaiKey);
+      if (!isOpenAIValid) {
+        setError("Invalid OpenAI API Key");
+        setIsLoading(false);
+        return;
+      }
+
+      onConnect(telegramToken, openaiKey);
+    } catch (error) {
+      setError("Connection failed. Please check your credentials.");
+      console.error("Connection error:", error);
+    } finally {
+      setIsLoading(false);
     }
-
-    if (!openaiKey.trim()) {
-      setError("OpenAI API Key is required");
-      return;
-    }
-
-    onConnect(telegramToken, openaiKey);
   };
 
   return (
@@ -53,7 +79,7 @@ const ConfigForm = ({ onConnect, onDisconnect, isConnected }: ConfigFormProps) =
             placeholder="Enter your bot token"
             value={telegramToken}
             onChange={(e) => setTelegramToken(e.target.value)}
-            disabled={isConnected}
+            disabled={isConnected || isLoading}
           />
           <Button
             type="button"
@@ -61,6 +87,7 @@ const ConfigForm = ({ onConnect, onDisconnect, isConnected }: ConfigFormProps) =
             size="icon"
             className="absolute right-0 top-0 h-full"
             onClick={() => setShowTelegramToken(!showTelegramToken)}
+            disabled={isConnected || isLoading}
           >
             {showTelegramToken ? <EyeOff size={16} /> : <Eye size={16} />}
           </Button>
@@ -79,7 +106,7 @@ const ConfigForm = ({ onConnect, onDisconnect, isConnected }: ConfigFormProps) =
             placeholder="Enter your OpenAI API key"
             value={openaiKey}
             onChange={(e) => setOpenaiKey(e.target.value)}
-            disabled={isConnected}
+            disabled={isConnected || isLoading}
           />
           <Button
             type="button"
@@ -87,6 +114,7 @@ const ConfigForm = ({ onConnect, onDisconnect, isConnected }: ConfigFormProps) =
             size="icon"
             className="absolute right-0 top-0 h-full"
             onClick={() => setShowOpenaiKey(!showOpenaiKey)}
+            disabled={isConnected || isLoading}
           >
             {showOpenaiKey ? <EyeOff size={16} /> : <Eye size={16} />}
           </Button>
@@ -103,12 +131,24 @@ const ConfigForm = ({ onConnect, onDisconnect, isConnected }: ConfigFormProps) =
             variant="destructive" 
             onClick={onDisconnect}
             className="w-full"
+            disabled={isLoading}
           >
             Disconnect Bot
           </Button>
         ) : (
-          <Button type="submit" className="w-full">
-            Connect Bot
+          <Button 
+            type="submit" 
+            className="w-full"
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Connecting...
+              </>
+            ) : (
+              "Connect Bot"
+            )}
           </Button>
         )}
       </div>

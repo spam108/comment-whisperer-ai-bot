@@ -1,29 +1,81 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
 import ConfigForm from "@/components/ConfigForm";
 import BotStatus from "@/components/BotStatus";
 import CommandList from "@/components/CommandList";
 import StatsDisplay from "@/components/StatsDisplay";
-import { mockStats, mockCommands } from "@/utils/mockData";
+import { mockCommands } from "@/utils/mockData";
+import { telegramBotService } from "@/services/TelegramBotService";
+import { statsService } from "@/services/StatsService";
 
 const Index = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [token, setToken] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [stats, setStats] = useState(statsService.getStats());
 
-  const handleConnect = (telegramToken: string, openaiKey: string) => {
-    // In a real implementation, this would validate and establish connections
-    setToken(telegramToken);
-    setApiKey(openaiKey);
-    setIsConnected(true);
-    console.log("Connecting with token:", telegramToken, "and API key:", openaiKey);
+  useEffect(() => {
+    // Check if token and API key are stored in localStorage
+    const savedToken = localStorage.getItem('telegram_bot_token');
+    const savedApiKey = localStorage.getItem('openai_api_key');
+    
+    if (savedToken && savedApiKey) {
+      setToken(savedToken);
+      setApiKey(savedApiKey);
+      // Auto-connect if credentials are available
+      handleConnect(savedToken, savedApiKey);
+    }
+    
+    // Set up a timer to refresh stats
+    const statsInterval = setInterval(() => {
+      setStats(statsService.getStats());
+    }, 5000);
+    
+    return () => {
+      clearInterval(statsInterval);
+    };
+  }, []);
+
+  const handleConnect = async (telegramToken: string, openaiKey: string) => {
+    try {
+      const connected = await telegramBotService.connect({
+        token: telegramToken,
+        openaiApiKey: openaiKey
+      });
+      
+      if (connected) {
+        setIsConnected(true);
+        setToken(telegramToken);
+        setApiKey(openaiKey);
+        
+        // Save credentials to localStorage
+        localStorage.setItem('telegram_bot_token', telegramToken);
+        localStorage.setItem('openai_api_key', openaiKey);
+        
+        // Log activity
+        statsService.addActivity("Bot connected");
+        
+        // Update stats immediately
+        setStats(statsService.getStats());
+      }
+    } catch (error) {
+      console.error("Connection failed:", error);
+      toast.error("Failed to connect the bot");
+    }
   };
 
   const handleDisconnect = () => {
+    telegramBotService.disconnect();
     setIsConnected(false);
-    console.log("Bot disconnected");
+    
+    // Log activity
+    statsService.addActivity("Bot disconnected");
+    
+    // Update stats immediately
+    setStats(statsService.getStats());
   };
 
   return (
@@ -84,7 +136,7 @@ const Index = () => {
                   <CardDescription>Bot activity metrics</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <StatsDisplay stats={mockStats} />
+                  <StatsDisplay stats={stats} />
                 </CardContent>
               </Card>
             </TabsContent>

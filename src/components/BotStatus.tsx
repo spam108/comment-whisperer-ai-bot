@@ -1,6 +1,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, XCircle } from "lucide-react";
+import { telegramBotService } from "@/services/TelegramBotService";
 
 interface BotStatusProps {
   isConnected: boolean;
