@@ -10,28 +10,28 @@ import StatsDisplay from "@/components/StatsDisplay";
 import { mockCommands } from "@/utils/mockData";
 import { telegramBotService } from "@/services/TelegramBotService";
 import { statsService } from "@/services/StatsService";
+import { botAccountsManager, BotAccount } from "@/services/BotAccountsManager";
 
 const Index = () => {
   const [isConnected, setIsConnected] = useState(false);
-  const [token, setToken] = useState("");
-  const [apiKey, setApiKey] = useState("");
   const [stats, setStats] = useState(statsService.getStats());
+  const [accounts, setAccounts] = useState<BotAccount[]>([]);
 
   useEffect(() => {
-    // Check if token and API key are stored in localStorage
-    const savedToken = localStorage.getItem('telegram_bot_token');
-    const savedApiKey = localStorage.getItem('openai_api_key');
+    // Load accounts and check for active account
+    const loadedAccounts = botAccountsManager.getAccounts();
+    setAccounts(loadedAccounts);
     
-    if (savedToken && savedApiKey) {
-      setToken(savedToken);
-      setApiKey(savedApiKey);
-      // Auto-connect if credentials are available
-      handleConnect(savedToken, savedApiKey);
+    const activeAccount = botAccountsManager.getActiveAccount();
+    if (activeAccount) {
+      // Auto-connect active account
+      handleActivateAccount(activeAccount.id);
     }
     
     // Set up a timer to refresh stats
     const statsInterval = setInterval(() => {
       setStats(statsService.getStats());
+      setIsConnected(telegramBotService.isConnected);
     }, 5000);
     
     return () => {
@@ -39,42 +39,36 @@ const Index = () => {
     };
   }, []);
 
-  const handleConnect = async (telegramToken: string, openaiKey: string) => {
+  const handleActivateAccount = async (accountId: string) => {
     try {
-      const connected = await telegramBotService.connect({
-        token: telegramToken,
-        openaiApiKey: openaiKey
-      });
+      const success = await botAccountsManager.activateAccount(accountId);
       
-      if (connected) {
+      if (success) {
         setIsConnected(true);
-        setToken(telegramToken);
-        setApiKey(openaiKey);
-        
-        // Save credentials to localStorage
-        localStorage.setItem('telegram_bot_token', telegramToken);
-        localStorage.setItem('openai_api_key', openaiKey);
         
         // Log activity
         statsService.addActivity("Bot connected");
         
         // Update stats immediately
         setStats(statsService.getStats());
+        
+        // Update accounts list
+        setAccounts(botAccountsManager.getAccounts());
       }
     } catch (error) {
-      console.error("Connection failed:", error);
-      toast.error("Failed to connect the bot");
+      console.error("Activation failed:", error);
+      toast.error("Failed to activate the bot");
     }
   };
 
-  const handleDisconnect = () => {
-    telegramBotService.disconnect();
-    setIsConnected(false);
+  const handleAccountsChange = () => {
+    // Update accounts list
+    setAccounts(botAccountsManager.getAccounts());
     
-    // Log activity
-    statsService.addActivity("Bot disconnected");
+    // Check if connection status changed
+    setIsConnected(telegramBotService.isConnected);
     
-    // Update stats immediately
+    // Update stats
     setStats(statsService.getStats());
   };
 
@@ -89,13 +83,12 @@ const Index = () => {
             <Card>
               <CardHeader>
                 <CardTitle>Bot Configuration</CardTitle>
-                <CardDescription>Set up your bot credentials</CardDescription>
+                <CardDescription>Set up your bot accounts</CardDescription>
               </CardHeader>
               <CardContent>
                 <ConfigForm 
-                  onConnect={handleConnect} 
-                  onDisconnect={handleDisconnect} 
-                  isConnected={isConnected}
+                  onAccountsChange={handleAccountsChange}
+                  accounts={accounts}
                 />
               </CardContent>
             </Card>

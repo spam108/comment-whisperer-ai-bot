@@ -2,12 +2,15 @@
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, XCircle } from "lucide-react";
 import { telegramBotService } from "@/services/TelegramBotService";
+import { botAccountsManager } from "@/services/BotAccountsManager";
 
 interface BotStatusProps {
   isConnected: boolean;
 }
 
 const BotStatus = ({ isConnected }: BotStatusProps) => {
+  const activeAccount = botAccountsManager.getActiveAccount();
+  
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -25,8 +28,13 @@ const BotStatus = ({ isConnected }: BotStatusProps) => {
         )}
       </div>
 
-      {isConnected && (
+      {isConnected && activeAccount && (
         <>
+          <div className="flex items-center justify-between">
+            <span className="font-medium">Active Bot:</span>
+            <span className="text-sm font-medium">{activeAccount.name}</span>
+          </div>
+          
           <div className="flex items-center justify-between">
             <span className="font-medium">Current Mode:</span>
             <Badge variant="secondary">Auto-reply</Badge>
@@ -53,7 +61,7 @@ const BotStatus = ({ isConnected }: BotStatusProps) => {
       {!isConnected && (
         <div className="pt-2">
           <p className="text-sm text-muted-foreground">
-            Configure and connect your bot to start responding to messages
+            Configure and activate a bot to start responding to messages
           </p>
         </div>
       )}
